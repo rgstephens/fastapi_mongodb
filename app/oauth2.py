@@ -37,6 +37,10 @@ class UserNotFound(Exception):
     pass
 
 
+class UserNotAdmin(Exception):
+    pass
+
+
 def require_user(Authorize: AuthJWT = Depends()):
     try:
         Authorize.jwt_required()
@@ -58,6 +62,44 @@ def require_user(Authorize: AuthJWT = Depends()):
         if error == 'UserNotFound':
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail='User no longer exist')
+        if error == 'UserNotAdmin':
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail='Must be administrator')
+        if error == 'NotVerified':
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail='Please verify your account')
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail='Token is invalid or has expired')
+    return user_id
+
+
+def require_admin(Authorize: AuthJWT = Depends()):
+    try:
+        Authorize.jwt_required()
+        user_id = Authorize.get_jwt_subject()
+        user = userEntity(User.find_one({'_id': ObjectId(str(user_id))}))
+
+        if not user:
+            raise UserNotFound('User no longer exist')
+
+        if not user["verified"]:
+            raise NotVerified('You are not verified')
+        
+        if user['role'] != 'admin':
+            raise UserNotAdmin('Must be administrator')
+
+    except Exception as e:
+        error = e.__class__.__name__
+        print(error)
+        if error == 'MissingTokenError':
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail='You are not logged in')
+        if error == 'UserNotFound':
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail='User no longer exist')
+        if error == 'UserNotAdmin':
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail='Must be administrator')
         if error == 'NotVerified':
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail='Please verify your account')
